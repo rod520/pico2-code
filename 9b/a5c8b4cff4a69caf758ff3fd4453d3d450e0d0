@@ -1,0 +1,19 @@
+build.zig.zon
+  s_734844866fabd8::t_8738ad832a96f9 1-27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "9ba5c8b4cff4a69caf758ff3fd4453d3d450e0d0",
+  "prompts": {},
+  "sessions": {
+    "s_734844866fabd8": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "73da0c53-5f7e-41c7-9bde-22d231037745",
+        "model": "unknown"
+      },
+      "human_author": "rod520 <rodriguesorlen@gmail.com>"
+    }
+  }
+}
