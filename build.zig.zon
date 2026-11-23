@@ -1,0 +1,27 @@
+.{
+    .name = .calculator_sim,
+    .version = "0.1.0",
+    .dependencies = .{
+        .sokol = .{
+            .url = "git+https://github.com/floooh/sokol-zig.git#4e943b2fbd5bb3fea3aa7a789825e2ad0a398e45",
+            .hash = "sokol-0.1.0-pb1HKwcNRACVCbiz29qj--NL4TbGMajgmUPzF0yP3O7T",
+        },
+        .microzig = .{
+            .url = "git+https://github.com/ZigEmbeddedGroup/microzig.git#e4e14cbc200ca08070b8c00d3a76104a45c2d819",
+            .hash = "microzig-0.17.43-D20YSZO3AAAAkZWVsef5x9XlCXLWPKbIvevysVJfExzc",
+        },
+        .truetype = .{
+            .url = "git+https://codeberg.org/andrewrk/TrueType.git#4fea1e7c0f9d4d79348d0302c7628f485301b6ac",
+            .hash = "TrueType-3.0.0-dev-Ne-mWBF4AQAMqTUooRKXp31FdyJSGmRwSIw4vy7EREcT",
+        },
+    },
+    .fingerprint = 0x800863f98be7109f,
+    .minimum_zig_version = "0.17.1",
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "README.md",
+        ".gitignore",
+    },
+}
