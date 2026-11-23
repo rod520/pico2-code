@@ -11,6 +11,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
+    const iosevka_module = b.createModule(.{
+        .root_source_file = b.path("assets/iosevka_font.zig"),
+        .target = target,
+        .optimize = optimize,
+    });
 
     const sim_options = b.addOptions();
     sim_options.addOption([]const u8, "mode", "sim");
@@ -22,6 +27,7 @@ pub fn build(b: *std.Build) void {
     sim_module.addImport("build_options", sim_options.createModule());
     sim_module.addImport("sokol", sokol_dep.module("sokol"));
     sim_module.addImport("TrueType", truetype_dep.module("TrueType"));
+    sim_module.addImport("iosevka_font", iosevka_module);
     const sim_exe = b.addExecutable(.{
         .name = "calculator-sim",
         .root_module = sim_module,
@@ -36,6 +42,7 @@ pub fn build(b: *std.Build) void {
     });
     native_module.addImport("build_options", native_options.createModule());
     native_module.addImport("TrueType", truetype_dep.module("TrueType"));
+    native_module.addImport("iosevka_font", iosevka_module);
     const native_exe = b.addExecutable(.{
         .name = "calculator-native",
         .root_module = native_module,
@@ -86,6 +93,8 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "sokol", .module = sokol_dep.module("sokol") },
+                .{ .name = "TrueType", .module = truetype_dep.module("TrueType") },
+                .{ .name = "iosevka_font", .module = iosevka_module },
             },
         }),
     });

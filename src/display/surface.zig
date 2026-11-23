@@ -68,6 +68,21 @@ pub const Surface = struct {
         self.pixels[index] = color.rgb565();
     }
 
+    pub fn drawPixelAlpha(self: *Surface, point: Point, color: Color, alpha: u8) void {
+        if (alpha == 0) return;
+        if (point.x < 0 or point.y < 0 or point.x >= self.width or point.y >= self.height) return;
+        const index = @as(usize, @intCast(point.y)) * @as(usize, @intCast(self.width)) +
+            @as(usize, @intCast(point.x));
+
+        const base = Color.fromRgb565(self.pixels[index]);
+        const inverse = 255 - alpha;
+        self.pixels[index] = Color.rgb(
+            @intCast((@as(u16, base.r) * inverse + @as(u16, color.r) * alpha) / 255),
+            @intCast((@as(u16, base.g) * inverse + @as(u16, color.g) * alpha) / 255),
+            @as(u8, @intCast((@as(u16, base.b) * inverse + @as(u16, color.b) * alpha) / 255)),
+        ).rgb565();
+    }
+
     pub fn drawPixelFrom(self: *Surface, reference: Point, offset: Point, color: Color) void {
         self.drawPixel(reference.offset(offset.x, offset.y), color);
     }

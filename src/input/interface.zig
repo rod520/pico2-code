@@ -80,6 +80,7 @@ test "arrow key mapping values" {
     try @import("std").testing.expectEqual(@as(u8, 2), @intFromEnum(Key.k2));
 }
 
-test "enter maps to key 60" {
-    try @import("std").testing.expectEqual(@as(u8, 60), @intFromEnum(Key.k60));
+test "enter maps to SW56 and equals to SW36" {
+    try @import("std").testing.expectEqual(@as(u8, 56), @intFromEnum(Key.k56));
+    try @import("std").testing.expectEqual(@as(u8, 36), @intFromEnum(Key.k36));
 }

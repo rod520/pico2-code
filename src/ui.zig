@@ -1,189 +1,246 @@
+const std = @import("std");
+const TrueType = @import("TrueType");
 const surface = @import("display/surface.zig");
 const input = @import("input/interface.zig");
-const spec = @import("display/spec.zig");
 
-pub const Alignment = enum {
-    left,
-    center,
-    right,
-};
-
-pub const Grid = struct {
-    origin: surface.Point = .{ .x = 0, .y = 0 },
-    cell_width: i32 = 16,
-    cell_height: i32 = 16,
-
-    pub fn rect(self: Grid, column: i32, row: i32, width: i32, height: i32) surface.Rect {
-        return .{
-            .origin = .{
-                .x = self.origin.x + column * self.cell_width,
-                .y = self.origin.y + row * self.cell_height,
-            },
-            .size = .{
-                .width = width * self.cell_width,
-                .height = height * self.cell_height,
-            },
-        };
-    }
-};
-
-fn glyphPattern(char: u8) [7]u5 {
-    return switch (char) {
-        'A' => .{ 0b01110, 0b10001, 0b10001, 0b11111, 0b10001, 0b10001, 0b10001 },
-        'C' => .{ 0b01111, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b01111 },
-        'E' => .{ 0b11111, 0b10000, 0b10000, 0b11110, 0b10000, 0b10000, 0b11111 },
-        'L' => .{ 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b10000, 0b11111 },
-        'N' => .{ 0b10001, 0b11001, 0b10101, 0b10011, 0b10001, 0b10001, 0b10001 },
-        'R' => .{ 0b11110, 0b10001, 0b10001, 0b11110, 0b10100, 0b10010, 0b10001 },
-        'T' => .{ 0b11111, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100, 0b00100 },
-        ' ' => .{ 0, 0, 0, 0, 0, 0, 0 },
-        '0' => .{ 0b11111, 0b10001, 0b10011, 0b10101, 0b11001, 0b10001, 0b11111 },
-        '1' => .{ 0b00100, 0b01100, 0b00100, 0b00100, 0b00100, 0b00100, 0b01110 },
-        '2' => .{ 0b11111, 0b00001, 0b00001, 0b11111, 0b10000, 0b10000, 0b11111 },
-        '3' => .{ 0b11111, 0b00001, 0b00001, 0b01111, 0b00001, 0b00001, 0b11111 },
-        '4' => .{ 0b10001, 0b10001, 0b10001, 0b11111, 0b00001, 0b00001, 0b00001 },
-        '5' => .{ 0b11111, 0b10000, 0b10000, 0b11111, 0b00001, 0b00001, 0b11111 },
-        '+' => .{ 0, 0b00100, 0b00100, 0b11111, 0b00100, 0b00100, 0 },
-        '=' => .{ 0, 0, 0b11111, 0, 0b11111, 0, 0 },
-        else => .{ 0b11111, 0b10001, 0b10101, 0b10101, 0b10101, 0b10001, 0b11111 },
-    };
-}
+const iosevka_font = @import("iosevka_font");
+const font_bytes = iosevka_font.bytes;
 
 pub fn drawText(
     display: *surface.Surface,
+    font: *const TrueType,
     origin: surface.Point,
     text: []const u8,
+    pixel_height: f32,
     color: surface.Color,
-    scale: i32,
 ) void {
+    const scale = font.scaleForPixelHeight(pixel_height);
     var x = origin.x;
-    for (text) |char| {
-        const pattern = glyphPattern(char);
-        for (pattern, 0..) |row, py| {
-            for (0..5) |px| {
-                if ((row & (@as(u5, 1) << @intCast(4 - px))) != 0) {
-                    var sy: i32 = 0;
-                    while (sy < scale) : (sy += 1) {
-                        var sx: i32 = 0;
-                        while (sx < scale) : (sx += 1) {
-                            display.drawPixel(.{
-                                .x = x + @as(i32, @intCast(px)) * scale + sx,
-                                .y = origin.y + @as(i32, @intCast(py)) * scale + sy,
-                            }, color);
-                        }
-                    }
-                }
+    var previous: ?TrueType.GlyphIndex = null;
+
+    for (text) |byte| {
+        const glyph = font.codepointGlyphIndex(byte);
+        if (previous) |a| {
+            const kern = @as(f32, @floatFromInt(font.glyphKernAdvance(a, glyph))) * scale / 64.0;
+            x += @as(i32, @intFromFloat(kern));
+        }
+
+        var pixels: std.ArrayList(u8) = .empty;
+        const dims = font.glyphBitmap(std.heap.smp_allocator, &pixels, glyph, scale, scale) catch return;
+        defer pixels.deinit(std.heap.smp_allocator);
+
+        var py: i32 = 0;
+        while (py < dims.height) : (py += 1) {
+            var px: i32 = 0;
+            while (px < dims.width) : (px += 1) {
+                const alpha = pixels.items[@as(usize, @intCast(py * dims.width + px))];
+                display.drawPixelAlpha(.{
+                    .x = x + px + dims.off_x,
+                    .y = origin.y + py + dims.off_y,
+                }, color, alpha);
             }
         }
-        x += 6 * scale;
+
+        const metrics = font.glyphHMetrics(glyph);
+        x += @as(i32, @intFromFloat(@as(f32, @floatFromInt(metrics.advance_width)) * scale + 0.5));
+        previous = glyph;
     }
 }
 
-pub const Button = struct {
-    rect: surface.Rect,
-    label: []const u8,
-    focused: bool = false,
-    activated: bool = false,
+pub fn textWidth(
+    font: *const TrueType,
+    text: []const u8,
+    pixel_height: f32,
+) i32 {
+    const scale = font.scaleForPixelHeight(pixel_height);
+    var width: i32 = 0;
+    var previous: ?TrueType.GlyphIndex = null;
 
-    pub fn draw(self: *const Button, display: *surface.Surface) void {
+    for (text) |byte| {
+        const glyph = font.codepointGlyphIndex(byte);
+        if (previous) |a| {
+            const kern = @as(f32, @floatFromInt(font.glyphKernAdvance(a, glyph))) * scale / 64.0;
+            width += @as(i32, @intFromFloat(kern));
+        }
+        const metrics = font.glyphHMetrics(glyph);
+        width += @as(i32, @intFromFloat(@as(f32, @floatFromInt(metrics.advance_width)) * scale + 0.5));
+        previous = glyph;
+    }
+    return width;
+}
+
+const layout = @import("input/layout.zig");
+
+pub fn drawKeyboard(
+    display: *surface.Surface,
+    font: *const TrueType,
+    focus_sw: u8,
+) void {
+    display.clear(surface.Color.rgb(12, 16, 24));
+
+    for (layout.key_buttons) |button| {
+        const column = @as(i32, button.column - 1);
+        const row = @as(i32, button.row - 1);
+        const rect = surface.Rect{
+            .origin = .{
+                .x = column * 62 + 2,
+                .y = row * 24 + 2,
+            },
+            .size = .{ .width = 58, .height = 20 },
+        };
         display.drawBorderedRect(
-            self.rect,
-            2,
-            if (self.focused)
+            rect,
+            1,
+            if (button.sw == focus_sw)
                 surface.Color.rgb(255, 196, 64)
             else
-                surface.Color.rgb(180, 180, 180),
+                surface.Color.rgb(150, 150, 150),
             surface.Color.rgb(35, 40, 52),
         );
 
-        const text_width = @as(i32, @intCast(self.label.len)) * 6;
         drawText(
             display,
+            font,
             .{
-                .x = self.rect.origin.x + @divTrunc(self.rect.size.width - text_width, 2),
-                .y = self.rect.origin.y + @divTrunc(self.rect.size.height - 7, 2),
+                .x = rect.origin.x + @divTrunc(rect.size.width - textWidth(font, button.primary, 18), 2),
+                .y = rect.origin.y + @divTrunc(rect.size.height - 12, 2) + 12,
             },
-            self.label,
-            if (self.activated)
-                surface.Color.rgb(255, 255, 255)
-            else
-                surface.Color.rgb(210, 210, 210),
-            1,
+            button.primary,
+            18,
+            surface.Color.rgb(230, 230, 230),
         );
     }
-};
+}
 
 pub const Screen = struct {
-    grid: Grid = .{},
-    title: []const u8,
-    expression: []const u8,
-    buttons: [2]Button,
-    focus_index: usize = 0,
-    activated_index: ?usize = null,
+    font: TrueType,
+    cursor: usize = 7,
+    expression: [32]u8 = @splat(0),
+    expression_len: usize = 0,
+    cursor_visible: bool = true,
+    cursor_frames: u32 = 0,
 
     pub fn init() Screen {
-        const grid: Grid = .{};
-        var buttons: [2]Button = undefined;
-        buttons[0] = .{
-            .rect = grid.rect(1, 11, 5, 2),
-            .label = "ENTER",
-            .focused = true,
-        };
-        buttons[1] = .{
-            .rect = grid.rect(14, 11, 5, 2),
-            .label = "CLEAR",
-        };
+        const font = TrueType.load(font_bytes) catch @panic("invalid Iosevka Fixed font");
+        var expression: [32]u8 = @splat(0);
+        const demo = "123+45";
+        @memcpy(expression[0..demo.len], demo);
         return .{
-            .title = "CALCULATOR",
-            .expression = "123 + 45",
-            .buttons = buttons,
+            .font = font,
+            .expression = expression,
+            .expression_len = demo.len,
         };
     }
 
     pub fn update(self: *Screen, keys: *const input.Interface) void {
-        if (keys.isPressed(.k11) or keys.isPressed(.k12)) {
-            self.focus_index = (self.focus_index + 1) % self.buttons.len;
-        } else if (keys.isPressed(.k2) or keys.isPressed(.k1)) {
-            self.focus_index = (self.focus_index + self.buttons.len - 1) % self.buttons.len;
+        self.cursor_frames +%= 1;
+        if (self.cursor_frames % 30 == 0) self.cursor_visible = !self.cursor_visible;
+
+        const character: ?u8 = if (keys.isPressed(.k30))
+            '0'
+        else if (keys.isPressed(.k29))
+            '1'
+        else if (keys.isPressed(.k39))
+            '2'
+        else if (keys.isPressed(.k49))
+            '3'
+        else if (keys.isPressed(.k28))
+            '4'
+        else if (keys.isPressed(.k38))
+            '5'
+        else if (keys.isPressed(.k48))
+            '6'
+        else if (keys.isPressed(.k27))
+            '7'
+        else if (keys.isPressed(.k37))
+            '8'
+        else if (keys.isPressed(.k47))
+            '9'
+        else if (keys.isPressed(.k40))
+            '.'
+        else if (keys.isPressed(.k25))
+            '('
+        else if (keys.isPressed(.k35))
+            ')'
+        else if (keys.isPressed(.k57))
+            '/'
+        else if (keys.isPressed(.k58))
+            '*'
+        else if (keys.isPressed(.k59))
+            '-'
+        else if (keys.isPressed(.k60))
+            '+'
+        else
+            null;
+
+        if (character) |char| {
+            if (self.expression_len < self.expression.len) {
+                if (self.cursor < self.expression_len) {
+                    var i = self.expression_len;
+                    while (i > self.cursor) : (i -= 1) {
+                        self.expression[i] = self.expression[i - 1];
+                    }
+                }
+                self.expression[self.cursor] = char;
+                self.expression_len += 1;
+                self.cursor += 1;
+            }
         }
 
-        for (&self.buttons, 0..) |*button, index| {
-            button.focused = index == self.focus_index;
+        if (keys.isPressed(.k36) and self.expression_len < self.expression.len) {
+            self.expression[self.expression_len] = '=';
+            self.expression_len += 1;
+        } else if (keys.isPressed(.k56) and self.expression_len < self.expression.len) {
+            self.expression[self.expression_len] = '=';
+            self.expression_len += 1;
         }
 
-        if (keys.isPressed(.k60)) {
-            self.activated_index = self.focus_index;
-            self.buttons[self.focus_index].activated = !self.buttons[self.focus_index].activated;
+        if (keys.isPressed(.k55) and self.cursor > 0) {
+            var i = self.cursor - 1;
+            while (i < self.expression_len - 1) : (i += 1) {
+                self.expression[i] = self.expression[i + 1];
+            }
+            self.expression_len -= 1;
+            self.cursor -= 1;
         }
+
+        if (keys.isPressed(.k2)) self.cursor = @max(0, self.cursor - 1);
+        if (keys.isPressed(.k11)) self.cursor = @min(self.expression_len, self.cursor + 1);
     }
 
     pub fn draw(self: *Screen, display: *surface.Surface) void {
         display.clear(surface.Color.rgb(20, 24, 34));
-        display.drawBorderedRect(
-            self.grid.rect(1, 1, 18, 2),
-            1,
-            surface.Color.rgb(84, 196, 255),
-            surface.Color.rgb(35, 40, 52),
-        );
-        drawText(display, .{ .x = 24, .y = 28 }, self.title, surface.Color.rgb(255, 255, 255), 2);
 
         display.drawBorderedRect(
-            self.grid.rect(1, 4, 18, 5),
+            .{
+                .origin = .{ .x = 8, .y = 8 },
+                .size = .{ .width = 304, .height = 72 },
+            },
             2,
-            surface.Color.rgb(180, 180, 180),
+            surface.Color.rgb(84, 196, 255),
             surface.Color.rgb(12, 16, 24),
         );
-        drawText(display, .{ .x = 32, .y = 88 }, self.expression, surface.Color.rgb(255, 196, 64), 2);
 
-        for (&self.buttons) |*button| button.draw(display);
+        drawText(
+            display,
+            &self.font,
+            .{ .x = 16, .y = 24 },
+            self.expression[0..self.expression_len],
+            18,
+            surface.Color.rgb(255, 255, 255),
+        );
+
+        if (self.cursor_visible) {
+            const cursor_x: i32 = 16 + textWidth(
+                &self.font,
+                self.expression[0..self.cursor],
+                18,
+            );
+            display.drawRect(.{
+                .origin = .{ .x = cursor_x, .y = 12 },
+                .size = .{ .width = 2, .height = 13 },
+            }, surface.Color.rgb(255, 196, 64));
+        }
+
     }
 };
-
-test "fixed grid creates display rectangles" {
-    const grid: Grid = .{};
-    const rect = grid.rect(1, 11, 5, 2);
-    try @import("std").testing.expectEqual(@as(i32, 16), rect.origin.x);
-    try @import("std").testing.expectEqual(@as(i32, 176), rect.origin.y);
-    try @import("std").testing.expectEqual(@as(i32, 80), rect.size.width);
-    try @import("std").testing.expectEqual(@as(i32, 32), rect.size.height);
-}
