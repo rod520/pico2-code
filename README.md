@@ -1,11 +1,15 @@
-# Calculator Sokol starter — milestone 1
+# Calculator Sokol starter
 
-A minimal Zig + Sokol desktop shell for the calculator project.
+A Zig + Sokol desktop simulator and future RP2350 firmware project.
 
 ## Locked decisions
 
 - Virtual LCD: 320 × 240 (4:3), RGB565 in the eventual controller emulator.
-- Desktop window starts at 320 × 240 client size and is resizable.
+- The LCD is 320 × 240.
+- The desktop simulator opens an unbroken 692 × 240 presentation: 320 × 240 LCD at left and 372 × 240 on-screen keypad at right.
+- The desktop keypad is a visual simulator panel, not part of the LCD or native hardware UI.
+- The keypad mirrors the 60-switch CSV layout: 6 columns × 10 rows.
+- The desktop window is resizable and letterboxes the combined simulator presentation.
 - Keyboard simulation will support both physical-key mapping and clickable on-screen keys.
 - The desktop build uses Sokol. Sokol must not leak into shared calculator or display-controller code.
 - The hardware build will later replace the simulation bus with the RP2350B parallel GPIO bus.
@@ -38,6 +42,18 @@ Build without launching:
 zig build sim
 ```
 
+Run the native placeholder:
+
+```sh
+zig build run-native
+```
+
+Run tests:
+
+```sh
+zig build test
+```
+
 ## Pico memory budgets
 
 The 320 × 240 RGB565 display surface is 153,600 bytes. The simulator checks this
@@ -48,13 +64,14 @@ against the RP2350's 520 KiB SRAM and 8 MiB PSRAM limits in `src/memory.zig`.
 - Keep generated font bitmaps and other read-only assets in flash or PSRAM.
 - Add new long-lived or frame-sized allocations to `src/memory.zig` before using them.
 
-## Milestone 1 acceptance
+## Simulator UI
 
-- Opens a native desktop window with a 320 × 240 initial client area.
-- Uses Sokol's application and graphics layers.
-- Window is resizable.
-- Clears the window every frame.
-- No display-controller emulation, framebuffer, keyboard, CAS, or RP2350 code is included yet.
+- The 320 × 240 LCD uses one RGB565 framebuffer.
+- The 372 × 240 side panel uses the 60-key CSV layout.
+- Iosevka Fixed is rasterized with TrueType for the LCD and key labels.
+- The LCD and keypad move together as one 692 × 240 presentation when the window scales.
+- Physical arrow keys, Enter, number keys, and operators map to logical keypad switches.
+- Mouse clicks on the side panel generate the same logical key presses as physical key events.
 
 ## Architecture planned after milestone 1
 
@@ -88,6 +105,6 @@ Add:
 1. `display/bus.zig` — small command/data write interface;
 2. `display/ili9342c.zig` — shared controller driver;
 3. `display/sim/controller.zig` — command interpreter and RGB565 framebuffer;
-4. Sokol texture upload and 4:3 letterboxed presentation.
+4. LCD texture upload and presentation.
 
 Do not add the hardware backend until the simulated command path is testable.

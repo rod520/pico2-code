@@ -15,6 +15,12 @@ const ui = @import("ui.zig");
 const iosevka_font = @import("iosevka_font");
 const TrueType = @import("TrueType");
 
+const lcd_width: f32 = spec.width;
+const lcd_height: f32 = spec.height;
+const keyboard_width: f32 = 372;
+const simulator_width: f32 = lcd_width + keyboard_width;
+const simulator_height: f32 = lcd_height;
+
 const State = struct {
     pass_action: sg.PassAction = .{},
     pixels: []u16 = &.{},
@@ -70,9 +76,9 @@ export fn frame() void {
 
     const window_width = @as(f32, @floatFromInt(sapp.width()));
     const window_height = @as(f32, @floatFromInt(sapp.height()));
-    const scale = @min(window_width / spec.width, window_height / spec.height);
-    const display_width = @as(f32, spec.width) * scale;
-    const display_height = @as(f32, spec.height) * scale;
+    const scale = @min(window_width / simulator_width, window_height / simulator_height);
+    const display_width = simulator_width * scale;
+    const display_height = simulator_height * scale;
     const left = (window_width - display_width) * 0.5;
     const top = (window_height - display_height) * 0.5;
 
@@ -120,10 +126,10 @@ export fn frame() void {
             }
 
             const color = display.Color.fromRgb565(rgb565);
-            const px = 320.0 + @as(f32, @floatFromInt(x));
-            const py = @as(f32, @floatFromInt(y));
-            const px2 = 320.0 + @as(f32, @floatFromInt(end_x));
-            const py2 = py + 1.0;
+            const px = left + lcd_width * scale + @as(f32, @floatFromInt(x)) * scale;
+            const py = top + @as(f32, @floatFromInt(y)) * scale;
+            const px2 = left + lcd_width * scale + @as(f32, @floatFromInt(end_x)) * scale;
+            const py2 = py + scale;
 
             const x1 = px / window_width * 2.0 - 1.0;
             const x2 = px2 / window_width * 2.0 - 1.0;
@@ -151,9 +157,16 @@ export fn cleanup() void {
 
 export fn event(ev: [*c]const sapp.Event) void {
     if (ev.*.type == .MOUSE_DOWN and ev.*.mouse_button == .LEFT) {
-        if (ev.*.mouse_x >= 320.0 and ev.*.mouse_x < 692.0) {
-            const column = @as(usize, @intFromFloat((ev.*.mouse_x - 320.0) / 62.0));
-            const row = @as(usize, @intFromFloat(ev.*.mouse_y / 24.0));
+        const window_width = @as(f32, @floatFromInt(sapp.width()));
+        const window_height = @as(f32, @floatFromInt(sapp.height()));
+        const scale = @min(window_width / simulator_width, window_height / simulator_height);
+        const left = (window_width - simulator_width * scale) * 0.5;
+        const top = (window_height - simulator_height * scale) * 0.5;
+        const panel_x = (ev.*.mouse_x - left - lcd_width * scale) / scale;
+        const panel_y = (ev.*.mouse_y - top) / scale;
+        if (panel_x >= 0 and panel_x < keyboard_width) {
+            const column = @as(usize, @intFromFloat(panel_x / 62.0));
+            const row = @as(usize, @intFromFloat(panel_y / 24.0));
             if (column < 6 and row < 10) {
                 for (layout.key_buttons) |button| {
                     if (button.column == column + 1 and button.row == row + 1) {
@@ -255,7 +268,7 @@ fn run(
         .frame_cb = frame,
         .cleanup_cb = cleanup,
         .event_cb = event,
-        .width = 692,
+        .width = @as(i32, @intFromFloat(simulator_width)),
         .height = 240,
         .window_title = "Calculator Simulator — 320 × 240 + Keyboard",
         .high_dpi = false,

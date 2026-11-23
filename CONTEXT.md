@@ -54,3 +54,9 @@ A display region that may have changed and must be redrawn.
 
 **Layout Grid**:
 A fixed display grid whose rows and columns position retained Views and text.
+
+**Simulator Keypad**:
+The desktop-only visual representation of the 60 physical calculator switches.
+
+**Switch**:
+A numbered physical calculator key, identified by SW1 through SW60.
