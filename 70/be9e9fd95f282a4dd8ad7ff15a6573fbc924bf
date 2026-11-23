@@ -1,0 +1,27 @@
+docs/adr/0003-side-by-side-simulator-keypad.md
+  s_734844866fabd8::t_85071723e421aa 1-3
+src/sim.zig
+  s_734844866fabd8::t_fee1fe901ebfa2 18-23,79-81,129-132,160-169,271
+README.md
+  s_734844866fabd8::t_85071723e421aa 1,3,8-12,45-56,67,69-74,108
+docs/adr/0002-retained-ui-and-dirty-redraw.md
+  s_734844866fabd8::t_85071723e421aa 3
+CONTEXT.md
+  s_734844866fabd8::t_85071723e421aa 57-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.5",
+  "base_commit_sha": "70be9e9fd95f282a4dd8ad7ff15a6573fbc924bf",
+  "prompts": {},
+  "sessions": {
+    "s_734844866fabd8": {
+      "agent_id": {
+        "tool": "github-copilot-cli",
+        "id": "73da0c53-5f7e-41c7-9bde-22d231037745",
+        "model": "unknown"
+      },
+      "human_author": "rod520 <rodriguesorlen@gmail.com>"
+    }
+  }
+}
